@@ -29,18 +29,21 @@ async function authHandler(request: Request): Promise<Response> {
     );
   }
 
+  // Accept token from Authorization header OR ?token= query param
   const authHeader = request.headers.get("Authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return new Response(
-      JSON.stringify({ error: "Unauthorized: Bearer token required" }),
-      { status: 401, headers: { "Content-Type": "application/json" } }
-    );
+  const url = new URL(request.url);
+  const queryToken = url.searchParams.get("token");
+
+  let token: string | null = null;
+  if (authHeader?.startsWith("Bearer ")) {
+    token = authHeader.slice(7);
+  } else if (queryToken) {
+    token = queryToken;
   }
 
-  const token = authHeader.slice(7);
-  if (token !== serverToken) {
+  if (!token || token !== serverToken) {
     return new Response(
-      JSON.stringify({ error: "Unauthorized: Invalid token" }),
+      JSON.stringify({ error: "Unauthorized: Valid Bearer token or ?token= query parameter required" }),
       { status: 401, headers: { "Content-Type": "application/json" } }
     );
   }
