@@ -31,6 +31,10 @@ MCP server providing 45 tools for the RetailExpress (Maropost) REST API v2.1. De
 # Required
 REX_API_KEY=your_api_key_here
 
+# Required: Bearer token for MCP endpoint authentication
+# Generate with: openssl rand -hex 32
+MCP_AUTH_TOKEN=your_random_token_here
+
 # Optional (defaults to https://api.retailexpress.com.au)
 REX_API_BASE_URL=https://api.retailexpress.com.au
 ```
@@ -39,25 +43,30 @@ REX_API_BASE_URL=https://api.retailexpress.com.au
 
 1. Push this repo to GitHub
 2. Import the repo in Vercel
-3. Add `REX_API_KEY` as an environment variable
+3. Add `REX_API_KEY` and `MCP_AUTH_TOKEN` as environment variables
 4. Deploy
 
-The MCP endpoint will be available at `https://your-project.vercel.app/mcp`
+The MCP endpoint will be available at `https://your-project.vercel.app/api/mcp`
 
 ### 4. Connect from Claude Code
 
-Add to your MCP config:
+Add to your MCP config (the `Authorization` header carries your `MCP_AUTH_TOKEN`):
 
 ```json
 {
   "mcpServers": {
     "rex": {
       "type": "url",
-      "url": "https://your-project.vercel.app/mcp"
+      "url": "https://your-project.vercel.app/api/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_MCP_AUTH_TOKEN"
+      }
     }
   }
 }
 ```
+
+All requests without a valid `Authorization: Bearer <token>` header are rejected with 401.
 
 ## Local Development
 
