@@ -1,0 +1,42 @@
+<evaluation>
+  <qa_pair>
+    <question>Using the RetailExpress API, find the total number of product types defined in the system. Respond with just the number.</question>
+    <answer>This requires live API access to determine - placeholder for post-deployment verification</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>List all retail outlets in RetailExpress. Which outlet has the alphabetically first name? Respond with just the outlet name.</question>
+    <answer>This requires live API access to determine - placeholder for post-deployment verification</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Find the product with SKU "SERGIO-MIKE" in RetailExpress. What is the product type name associated with this product? Respond with just the product type name.</question>
+    <answer>This requires live API access to determine - placeholder for post-deployment verification</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>How many distinct suppliers are registered in RetailExpress? First list all suppliers using pagination (page_size 250), then count the total. Respond with just the number from total_records.</question>
+    <answer>This requires live API access to determine - placeholder for post-deployment verification</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Find the purchase order with the most recent created_since date in 2026. What is the supplier name associated with that PO? First list recent POs, then look up the supplier. Respond with just the supplier name.</question>
+    <answer>This requires live API access to determine - placeholder for post-deployment verification</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>How many freight types are configured in RetailExpress? List them all and count. Respond with just the number.</question>
+    <answer>This requires live API access to determine - placeholder for post-deployment verification</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Find all inventory movement logs for the Claremont outlet (you will need to first find the outlet ID for Claremont, then query movement logs filtered by that outlet_id). How many movement log entries exist for this outlet? Respond with the total_records count.</question>
+    <answer>This requires live API access to determine - placeholder for post-deployment verification</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>What currencies are supported in RetailExpress? List all currencies and identify which one has the code "AUD". What is the full currency name? Respond with just the currency name.</question>
+    <answer>Australian Dollar</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Find the customer type that is used for online/ecommerce customers. First list all customer types, then identify the one most likely for online shoppers. What is its name? Respond with just the customer type name.</question>
+    <answer>This requires live API access to determine - placeholder for post-deployment verification</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>How many voucher types are defined in RetailExpress? List all voucher types and respond with just the count as a number.</question>
+    <answer>This requires live API access to determine - placeholder for post-deployment verification</answer>
+  </qa_pair>
+</evaluation>
