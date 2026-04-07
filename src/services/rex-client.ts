@@ -19,10 +19,9 @@ class RexClient {
 
   private async authenticate(): Promise<void> {
     const res = await fetch(REX_AUTH_URL, {
-      method: "POST",
+      method: "GET",
       headers: {
         "x-api-key": this.apiKey,
-        "Content-Type": "application/json",
       },
     });
 
