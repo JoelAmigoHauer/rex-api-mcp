@@ -21,7 +21,7 @@ const mcpHandler = createMcpHandler(
     },
   },
   {
-    basePath: "/api/mcp",
+    basePath: "/api",
     maxDuration: 30,
   }
 );
@@ -47,7 +47,18 @@ async function authHandler(
     );
   }
 
-  return mcpHandler(request);
+  // Rewrite URL so mcp-handler sees /api/mcp (transport = "mcp")
+  const url = new URL(request.url);
+  url.pathname = "/api/mcp";
+  const rewritten = new Request(url.toString(), {
+    method: request.method,
+    headers: request.headers,
+    body: request.body,
+    // @ts-expect-error duplex needed for streaming body
+    duplex: "half",
+  });
+
+  return mcpHandler(rewritten);
 }
 
 export {
