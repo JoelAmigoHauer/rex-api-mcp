@@ -1,4 +1,4 @@
-import { REX_SOAP_IPS_URL, REX_SOAP_NAMESPACE } from "../constants";
+import { REX_SOAP_IPS_URL, REX_SOAP_WEBSTORE_URL, REX_SOAP_NAMESPACE } from "../constants";
 
 interface SoapConfig {
   clientId: string;
@@ -38,10 +38,11 @@ class RexSoapClient {
 </soap:Envelope>`;
   }
 
-  async call(action: string, bodyContent: string): Promise<SoapResponse> {
+  async call(action: string, bodyContent: string, endpoint?: "ips" | "webstore"): Promise<SoapResponse> {
     const envelope = this.buildEnvelope(action, bodyContent);
+    const url = endpoint === "webstore" ? REX_SOAP_WEBSTORE_URL : REX_SOAP_IPS_URL;
 
-    const res = await fetch(REX_SOAP_IPS_URL, {
+    const res = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
@@ -185,6 +186,44 @@ class RexSoapClient {
     }
     return values;
   }
+}
+
+/**
+ * Parse flat XML elements into a key-value record.
+ * Handles simple <Tag>Value</Tag> patterns (no nesting).
+ */
+export function xmlToRecord(xml: string): Record<string, string> {
+  const record: Record<string, string> = {};
+  const regex = /<(\w+)>([^<]*)<\/\1>/g;
+  let m: RegExpExecArray | null;
+  while ((m = regex.exec(xml)) !== null) {
+    record[m[1]!] = m[2]!;
+  }
+  return record;
+}
+
+/**
+ * Extract repeating XML elements into an array of records.
+ * E.g. extractRecords(xml, "Product") finds all <Product>...</Product> blocks.
+ */
+export function extractRecords(xml: string, elementTag: string): Record<string, string>[] {
+  const records: Record<string, string>[] = [];
+  const regex = new RegExp(`<${elementTag}\\b[^>]*>([\\s\\S]*?)<\\/${elementTag}>`, "g");
+  let m: RegExpExecArray | null;
+  while ((m = regex.exec(xml)) !== null) {
+    records.push(xmlToRecord(m[1]!));
+  }
+  return records;
+}
+
+/**
+ * Extract the SOAP result element content for a given action.
+ * Looks for <{Action}Result>...</{Action}Result> in the response.
+ */
+export function extractSoapResult(xml: string, action: string): string {
+  const regex = new RegExp(`<${action}Result\\b[^>]*>([\\s\\S]*?)<\\/${action}Result>`);
+  const match = xml.match(regex);
+  return match?.[1]?.trim() ?? "";
 }
 
 // XML builder helpers

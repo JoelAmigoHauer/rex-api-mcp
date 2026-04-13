@@ -9,6 +9,7 @@ import { registerCustomerTools } from "./customers";
 import { registerPurchasingTools } from "./purchasing";
 import { registerFinanceTools } from "./finance";
 import { registerSoapWriteTools } from "./soap-writes";
+import { registerSoapReadTools } from "./soap-reads";
 
 export function registerAllTools(
   server: McpServer,
@@ -24,8 +25,9 @@ export function registerAllTools(
   registerPurchasingTools(server, client);
   registerFinanceTools(server, client);
 
-  // SOAP/IPS API tools (write operations)
+  // SOAP/IPS API tools
   if (soapClient) {
     registerSoapWriteTools(server, soapClient);
+    registerSoapReadTools(server, soapClient);
   }
 }

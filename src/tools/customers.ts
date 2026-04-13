@@ -10,7 +10,6 @@ const paginationOnlySchema = z.object({
 }).strict();
 
 export function registerCustomerTools(server: McpServer, client: RexClient): void {
-  // ── rex_list_customers ───────────────────────────────────────────────
   server.registerTool(
     "rex_list_customers",
     {
@@ -44,7 +43,6 @@ export function registerCustomerTools(server: McpServer, client: RexClient): voi
     }
   );
 
-  // ── rex_get_customer ─────────────────────────────────────────────────
   server.registerTool(
     "rex_get_customer",
     {
@@ -71,39 +69,6 @@ export function registerCustomerTools(server: McpServer, client: RexClient): voi
     }
   );
 
-  // ── rex_list_customer_types ──────────────────────────────────────────
-  server.registerTool(
-    "rex_list_customer_types",
-    {
-      description:
-        "List customer classification types from RetailExpress (e.g. Retail, Wholesale, VIP). Returns paginated results.",
-      inputSchema: paginationOnlySchema,
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: false,
-      },
-    },
-    async (params) => {
-      try {
-        const query = stripUndefined({
-          page_number: params.page_number?.toString(),
-          page_size: params.page_size?.toString(),
-        });
-        const result = await client.getList<Record<string, unknown>>(
-          "/customer-types",
-          query
-        );
-        return formatSuccess(result as unknown as Record<string, unknown>);
-      } catch (err) {
-        const e = err as { status?: number; message?: string };
-        return formatError(e.status ?? 500, e.message ?? "Unknown error");
-      }
-    }
-  );
-
-  // ── rex_list_customer_survey_segments ─────────────────────────────────
   server.registerTool(
     "rex_list_customer_survey_segments",
     {

@@ -100,89 +100,7 @@ export function registerProductTools(
     }
   });
 
-  // 4. List product types
-  server.registerTool("rex_list_product_types", {
-    title: "List Product Types",
-    description:
-      "List all product classification types in RetailExpress (e.g. Furniture, Homewares, Outdoor).",
-    inputSchema: z
-      .object({
-        ...paginationInputSchema,
-      })
-      .strict(),
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-  }, async (params) => {
-    try {
-      const queryParams = stripUndefined({
-        page_number: params.page_number,
-        page_size: params.page_size,
-      });
-      const data = await client.getList<Record<string, unknown>>(
-        "/product-types",
-        queryParams
-      );
-      return formatSuccess({
-        product_types: data.data,
-        pagination: {
-          page_number: data.page_number,
-          page_size: data.page_size,
-          total_records: data.total_records,
-          has_more: data.has_more,
-        },
-      });
-    } catch (err: unknown) {
-      const e = err as { status?: number; message?: string };
-      return formatError(e.status ?? 500, e.message ?? "Unknown error");
-    }
-  });
-
-  // 5. List product attributes
-  server.registerTool("rex_list_product_attributes", {
-    title: "List Product Attributes",
-    description:
-      "List product attributes and custom fields defined in RetailExpress.",
-    inputSchema: z
-      .object({
-        ...paginationInputSchema,
-      })
-      .strict(),
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-  }, async (params) => {
-    try {
-      const queryParams = stripUndefined({
-        page_number: params.page_number,
-        page_size: params.page_size,
-      });
-      const data = await client.getList<Record<string, unknown>>(
-        "/product-attributes",
-        queryParams
-      );
-      return formatSuccess({
-        product_attributes: data.data,
-        pagination: {
-          page_number: data.page_number,
-          page_size: data.page_size,
-          total_records: data.total_records,
-          has_more: data.has_more,
-        },
-      });
-    } catch (err: unknown) {
-      const e = err as { status?: number; message?: string };
-      return formatError(e.status ?? 500, e.message ?? "Unknown error");
-    }
-  });
-
-  // 6. List product barcodes
+  // 4. List product barcodes
   server.registerTool("rex_list_product_barcodes", {
     title: "List Product Barcodes",
     description:
@@ -229,7 +147,7 @@ export function registerProductTools(
     }
   });
 
-  // 7. List product prices
+  // 5. List product prices
   server.registerTool("rex_list_product_prices", {
     title: "List Product Prices",
     description:
