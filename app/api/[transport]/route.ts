@@ -1,11 +1,19 @@
 import { createMcpHandler } from "mcp-handler";
 import { registerAllTools } from "@/tools/index";
 import { getRexClient } from "@/services/rex-client";
+import { getSoapClient } from "@/services/soap-client";
 
 const mcpHandler = createMcpHandler(
   (server) => {
     const client = getRexClient();
-    registerAllTools(server, client);
+    // SOAP client is optional - only initialised if credentials are set
+    let soapClient;
+    try {
+      soapClient = getSoapClient();
+    } catch {
+      // SOAP env vars not configured - REST-only mode
+    }
+    registerAllTools(server, client, soapClient);
   },
   {
     serverInfo: {
