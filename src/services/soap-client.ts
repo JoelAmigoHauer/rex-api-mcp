@@ -226,6 +226,47 @@ export function extractSoapResult(xml: string, action: string): string {
   return match?.[1]?.trim() ?? "";
 }
 
+/**
+ * Decode base64-encoded gzip-compressed XML data.
+ * IPS SOAP read methods return data in this format inside the Result element.
+ */
+export async function decodeBase64Gzip(base64Data: string): Promise<string> {
+  // Decode base64 to binary
+  const binaryStr = atob(base64Data);
+  const bytes = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) {
+    bytes[i] = binaryStr.charCodeAt(i);
+  }
+
+  // Decompress gzip
+  const ds = new DecompressionStream("gzip");
+  const decompressed = new Response(
+    new Blob([bytes]).stream().pipeThrough(ds)
+  );
+  return decompressed.text();
+}
+
+/**
+ * Extract and decode the SOAP read result for IPS API methods.
+ * Handles the base64+gzip encoding used by IPS read responses.
+ * Falls back to plain XML if not base64-encoded.
+ */
+export async function extractAndDecodeSoapResult(xml: string, action: string): Promise<string> {
+  const raw = extractSoapResult(xml, action);
+  if (!raw) return "";
+
+  // Check if it looks like base64 (no XML tags, mostly alphanumeric + /+=)
+  if (!raw.startsWith("<") && /^[A-Za-z0-9+/=\s]+$/.test(raw.substring(0, 100))) {
+    try {
+      return await decodeBase64Gzip(raw.replace(/\s/g, ""));
+    } catch {
+      // Not base64+gzip, return as-is
+      return raw;
+    }
+  }
+  return raw;
+}
+
 // XML builder helpers
 
 export function xmlElement(tag: string, value: string | number | boolean): string {

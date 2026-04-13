@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { RexSoapClient } from "../services/soap-client";
 import {
-  extractSoapResult,
+  extractAndDecodeSoapResult,
   extractRecords,
   xmlOptional,
 } from "../services/soap-client";
@@ -15,6 +15,25 @@ import {
   getPurchaseOrdersWithSupplierInvNoSchema,
 } from "../schemas/soap-reads";
 
+/** Helper: call SOAP, decode base64+gzip result, extract Row records */
+async function callAndExtract(
+  soapClient: RexSoapClient,
+  action: string,
+  body: string,
+  recordTag?: string
+): Promise<Record<string, string>[]> {
+  const result = await soapClient.call(action, body);
+  const decodedXml = await extractAndDecodeSoapResult(result.raw, action);
+  if (!decodedXml) return [];
+
+  // Try specific tag first, then generic Row
+  if (recordTag) {
+    const records = extractRecords(decodedXml, recordTag);
+    if (records.length > 0) return records;
+  }
+  return extractRecords(decodedXml, "Row");
+}
+
 export function registerSoapReadTools(
   server: McpServer,
   soapClient: RexSoapClient
@@ -25,7 +44,7 @@ export function registerSoapReadTools(
     {
       title: "List Product Groups (Attributes)",
       description:
-        "List all product attribute groups from RetailExpress: Sizes, Colours, Seasons, Brands, Product Types, and Suppliers. Returns the full taxonomy used for product classification. Uses the IPS SOAP API (replaces REST product-types and product-attributes endpoints).",
+        "List all product attribute groups from RetailExpress: Sizes, Colours, Seasons, Brands, Product Types, and Suppliers. Each record has Identifier, Value, and Description fields. Uses the IPS SOAP API (replaces REST product-types and product-attributes endpoints).",
       inputSchema: getGroupsSchema,
       annotations: {
         readOnlyHint: true,
@@ -36,31 +55,11 @@ export function registerSoapReadTools(
     },
     async () => {
       try {
-        const result = await soapClient.call("GetGroups", "");
-        const resultXml = extractSoapResult(result.raw, "GetGroups");
-
-        // Parse each group type
-        const groups: Record<string, Record<string, string>[]> = {};
-        const groupTypes = [
-          "Size",
-          "Colour",
-          "Season",
-          "Brand",
-          "ProductType",
-          "Supplier",
-        ];
-        for (const type of groupTypes) {
-          groups[type] = extractRecords(resultXml, type);
-        }
-
-        // If no typed groups found, try generic parsing
-        const hasData = Object.values(groups).some((arr) => arr.length > 0);
-        if (!hasData) {
-          // Try extracting any Group elements
-          groups["All"] = extractRecords(resultXml, "Group");
-        }
-
-        return formatSuccess({ groups });
+        const records = await callAndExtract(soapClient, "GetGroups", "");
+        return formatSuccess({
+          groups: records,
+          total_records: records.length,
+        });
       } catch (err: unknown) {
         const e = err as { status?: number; message?: string };
         return formatError(e.status ?? 500, e.message ?? "Unknown error");
@@ -74,7 +73,7 @@ export function registerSoapReadTools(
     {
       title: "List Daily Stock Movements",
       description:
-        "List stock movements for a given date in RetailExpress. Optionally filter by SKU or outlet. Returns quantity changes, movement types, and related document references. Uses the IPS SOAP API (replaces REST inventory-movement-logs endpoint).",
+        "List stock movements for a given date in RetailExpress. Optionally filter by SKU or outlet. Returns fields: Date, Product_Id, SKU, WHID, WarehouseName, ExtOutletCode, TransactionType, StockOnHand, InTransitOutbound, InTransitInBound, Faulty. Uses the IPS SOAP API (replaces REST inventory-movement-logs endpoint).",
       inputSchema: getDailyStockMovementsSchema,
       annotations: {
         readOnlyHint: true,
@@ -86,27 +85,16 @@ export function registerSoapReadTools(
     async (params) => {
       try {
         const body = `<ret:date>${params.date}T00:00:00</ret:date>${xmlOptional("ret:sku", params.sku)}${xmlOptional("ret:outletId", params.outlet_id)}`;
-
-        const result = await soapClient.call("GetDailyStockMovements", body);
-        const resultXml = extractSoapResult(
-          result.raw,
-          "GetDailyStockMovements"
+        const records = await callAndExtract(
+          soapClient,
+          "GetDailyStockMovements",
+          body
         );
-
-        // Try common element names for movement records
-        let movements = extractRecords(resultXml, "StockMovement");
-        if (movements.length === 0) {
-          movements = extractRecords(resultXml, "Movement");
-        }
-        if (movements.length === 0) {
-          movements = extractRecords(resultXml, "Row");
-        }
 
         return formatSuccess({
           date: params.date,
-          movements,
-          total_records: movements.length,
-          raw_available: movements.length === 0,
+          movements: records,
+          total_records: records.length,
         });
       } catch (err: unknown) {
         const e = err as { status?: number; message?: string };
@@ -133,22 +121,16 @@ export function registerSoapReadTools(
     async (params) => {
       try {
         const body = `<ret:fromDate>${params.from_date}T00:00:00</ret:fromDate><ret:includeExported>${params.include_exported ?? true}</ret:includeExported>${xmlOptional("ret:sourceType", params.source_type)}`;
-
-        const result = await soapClient.call("GetStockReceipts", body);
-        const resultXml = extractSoapResult(result.raw, "GetStockReceipts");
-
-        let receipts = extractRecords(resultXml, "StockReceipt");
-        if (receipts.length === 0) {
-          receipts = extractRecords(resultXml, "Receipt");
-        }
-        if (receipts.length === 0) {
-          receipts = extractRecords(resultXml, "Row");
-        }
+        const records = await callAndExtract(
+          soapClient,
+          "GetStockReceipts",
+          body
+        );
 
         return formatSuccess({
           from_date: params.from_date,
-          receipts,
-          total_records: receipts.length,
+          receipts: records,
+          total_records: records.length,
         });
       } catch (err: unknown) {
         const e = err as { status?: number; message?: string };
@@ -175,23 +157,17 @@ export function registerSoapReadTools(
     async (params) => {
       try {
         const body = `<ret:dateFrom>${params.date_from}T00:00:00</ret:dateFrom><ret:dateTo>${params.date_to}T23:59:59</ret:dateTo>${params.adjustment_id !== undefined ? `<ret:adjustmentId>${params.adjustment_id}</ret:adjustmentId>` : ""}${params.whid !== undefined ? `<ret:whid>${params.whid}</ret:whid>` : ""}`;
-
-        const result = await soapClient.call("GetStockAdjustments", body);
-        const resultXml = extractSoapResult(result.raw, "GetStockAdjustments");
-
-        let adjustments = extractRecords(resultXml, "StockAdjustment");
-        if (adjustments.length === 0) {
-          adjustments = extractRecords(resultXml, "Adjustment");
-        }
-        if (adjustments.length === 0) {
-          adjustments = extractRecords(resultXml, "Row");
-        }
+        const records = await callAndExtract(
+          soapClient,
+          "GetStockAdjustments",
+          body
+        );
 
         return formatSuccess({
           date_from: params.date_from,
           date_to: params.date_to,
-          adjustments,
-          total_records: adjustments.length,
+          adjustments: records,
+          total_records: records.length,
         });
       } catch (err: unknown) {
         const e = err as { status?: number; message?: string };
@@ -218,26 +194,17 @@ export function registerSoapReadTools(
     async (params) => {
       try {
         const body = `<ret:dateFrom>${params.date_from}T00:00:00</ret:dateFrom><ret:dateTo>${params.date_to}T23:59:59</ret:dateTo>${params.poid !== undefined ? `<ret:poid>${params.poid}</ret:poid>` : ""}${params.whid !== undefined ? `<ret:whid>${params.whid}</ret:whid>` : ""}${xmlOptional("ret:outletExtRef", params.outlet_ext_ref)}`;
-
-        const result = await soapClient.call(
+        const records = await callAndExtract(
+          soapClient,
           "GetPurchaseOrdersDetailed",
           body
         );
-        const resultXml = extractSoapResult(
-          result.raw,
-          "GetPurchaseOrdersDetailed"
-        );
-
-        let purchase_orders = extractRecords(resultXml, "PurchaseOrder");
-        if (purchase_orders.length === 0) {
-          purchase_orders = extractRecords(resultXml, "Row");
-        }
 
         return formatSuccess({
           date_from: params.date_from,
           date_to: params.date_to,
-          purchase_orders,
-          total_records: purchase_orders.length,
+          purchase_orders: records,
+          total_records: records.length,
         });
       } catch (err: unknown) {
         const e = err as { status?: number; message?: string };
@@ -263,23 +230,15 @@ export function registerSoapReadTools(
     },
     async () => {
       try {
-        const result = await soapClient.call(
+        const records = await callAndExtract(
+          soapClient,
           "GetPurchaseOrdersWithSupplierInvNo",
           ""
         );
-        const resultXml = extractSoapResult(
-          result.raw,
-          "GetPurchaseOrdersWithSupplierInvNo"
-        );
-
-        let purchase_orders = extractRecords(resultXml, "PurchaseOrder");
-        if (purchase_orders.length === 0) {
-          purchase_orders = extractRecords(resultXml, "Row");
-        }
 
         return formatSuccess({
-          purchase_orders,
-          total_records: purchase_orders.length,
+          purchase_orders: records,
+          total_records: records.length,
         });
       } catch (err: unknown) {
         const e = err as { status?: number; message?: string };
