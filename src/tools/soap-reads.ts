@@ -15,7 +15,8 @@ import {
   getPurchaseOrdersWithSupplierInvNoSchema,
 } from "../schemas/soap-reads";
 
-/** Helper: call SOAP, decode base64+gzip result, extract Row records */
+/** Helper: call SOAP, decode base64+gzip result, extract records.
+ *  REX IPS returns .NET DataSet XML where records are <Table> elements. */
 async function callAndExtract(
   soapClient: RexSoapClient,
   action: string,
@@ -26,12 +27,16 @@ async function callAndExtract(
   const decodedXml = await extractAndDecodeSoapResult(result.raw, action);
   if (!decodedXml) return [];
 
-  // Try specific tag first, then generic Row
-  if (recordTag) {
-    const records = extractRecords(decodedXml, recordTag);
+  // Try specific tag first, then .NET DataSet conventions
+  const candidates = recordTag
+    ? [recordTag, "Table", "Table1", "Row"]
+    : ["Table", "Table1", "Row"];
+
+  for (const tag of candidates) {
+    const records = extractRecords(decodedXml, tag);
     if (records.length > 0) return records;
   }
-  return extractRecords(decodedXml, "Row");
+  return [];
 }
 
 export function registerSoapReadTools(
