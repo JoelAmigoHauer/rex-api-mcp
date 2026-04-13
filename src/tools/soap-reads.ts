@@ -3,6 +3,7 @@ import type { RexSoapClient } from "../services/soap-client";
 import {
   extractAndDecodeSoapResult,
   extractRecords,
+  detectRecordTag,
   xmlOptional,
 } from "../services/soap-client";
 import { formatSuccess, formatError } from "../utils";
@@ -23,6 +24,7 @@ interface ExtractResult {
     decoded_length: number;
     decoded_snippet: string;
     tried_tags: string[];
+    detected_tag?: string | null;
   };
 }
 
@@ -38,11 +40,6 @@ async function callAndExtract(
   const rawXml = result.raw;
   const decodedXml = await extractAndDecodeSoapResult(rawXml, action);
 
-  // Try specific tag first, then .NET DataSet conventions
-  const candidates = recordTag
-    ? [recordTag, "Table", "Table1", "Row"]
-    : ["Table", "Table1", "Row"];
-
   if (!decodedXml) {
     return {
       records: [],
@@ -51,10 +48,16 @@ async function callAndExtract(
         raw_snippet: rawXml.substring(0, 500),
         decoded_length: 0,
         decoded_snippet: "(empty - extractSoapResult returned nothing)",
-        tried_tags: candidates,
+        tried_tags: [],
       },
     };
   }
+
+  // Auto-detect the record element from the inline XSD schema
+  const detectedTag = detectRecordTag(decodedXml);
+  const candidates = recordTag
+    ? [recordTag, ...(detectedTag ? [detectedTag] : []), "Table", "Table1", "Row"]
+    : [...(detectedTag ? [detectedTag] : []), "Table", "Table1", "Row"];
 
   for (const tag of candidates) {
     const records = extractRecords(decodedXml, tag);
@@ -70,6 +73,7 @@ async function callAndExtract(
       decoded_length: decodedXml.length,
       decoded_snippet: decodedXml.substring(0, 500),
       tried_tags: candidates,
+      detected_tag: detectedTag,
     },
   };
 }

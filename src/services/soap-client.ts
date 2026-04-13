@@ -217,6 +217,31 @@ export function extractRecords(xml: string, elementTag: string): Record<string, 
 }
 
 /**
+ * Auto-detect the record element tag in a .NET DataSet XML response.
+ * Looks at the XSD schema for the first xs:element with xs:complexType > xs:sequence
+ * (the row definition), or falls back to finding the first repeated data element
+ * after the schema block.
+ */
+export function detectRecordTag(xml: string): string | null {
+  // Strategy 1: Find the row element name from the inline XSD schema
+  // Pattern: <xs:element name="Group"><xs:complexType><xs:sequence>
+  const schemaMatch = xml.match(
+    /<xs:element\s+name="(\w+)"[^>]*>\s*<xs:complexType>\s*<xs:sequence>/
+  );
+  if (schemaMatch) return schemaMatch[1]!;
+
+  // Strategy 2: Find the first element after </xs:schema> that repeats
+  const schemaEnd = xml.indexOf("</xs:schema>");
+  if (schemaEnd > -1) {
+    const dataSection = xml.substring(schemaEnd + "</xs:schema>".length);
+    const firstTag = dataSection.match(/<(\w+)\b[^/>]*>/);
+    if (firstTag) return firstTag[1]!;
+  }
+
+  return null;
+}
+
+/**
  * Extract the SOAP result element content for a given action.
  * Handles namespace-prefixed tags (e.g. <ret:GetGroupsResult>).
  */
