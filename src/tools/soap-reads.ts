@@ -15,6 +15,17 @@ import {
   getPurchaseOrdersWithSupplierInvNoSchema,
 } from "../schemas/soap-reads";
 
+interface ExtractResult {
+  records: Record<string, string>[];
+  _debug?: {
+    raw_length: number;
+    raw_snippet: string;
+    decoded_length: number;
+    decoded_snippet: string;
+    tried_tags: string[];
+  };
+}
+
 /** Helper: call SOAP, decode base64+gzip result, extract records.
  *  REX IPS returns .NET DataSet XML where records are <Table> elements. */
 async function callAndExtract(
@@ -22,21 +33,45 @@ async function callAndExtract(
   action: string,
   body: string,
   recordTag?: string
-): Promise<Record<string, string>[]> {
+): Promise<ExtractResult> {
   const result = await soapClient.call(action, body);
-  const decodedXml = await extractAndDecodeSoapResult(result.raw, action);
-  if (!decodedXml) return [];
+  const rawXml = result.raw;
+  const decodedXml = await extractAndDecodeSoapResult(rawXml, action);
 
   // Try specific tag first, then .NET DataSet conventions
   const candidates = recordTag
     ? [recordTag, "Table", "Table1", "Row"]
     : ["Table", "Table1", "Row"];
 
+  if (!decodedXml) {
+    return {
+      records: [],
+      _debug: {
+        raw_length: rawXml.length,
+        raw_snippet: rawXml.substring(0, 500),
+        decoded_length: 0,
+        decoded_snippet: "(empty - extractSoapResult returned nothing)",
+        tried_tags: candidates,
+      },
+    };
+  }
+
   for (const tag of candidates) {
     const records = extractRecords(decodedXml, tag);
-    if (records.length > 0) return records;
+    if (records.length > 0) return { records };
   }
-  return [];
+
+  // No records found — include debug info
+  return {
+    records: [],
+    _debug: {
+      raw_length: rawXml.length,
+      raw_snippet: rawXml.substring(0, 500),
+      decoded_length: decodedXml.length,
+      decoded_snippet: decodedXml.substring(0, 500),
+      tried_tags: candidates,
+    },
+  };
 }
 
 export function registerSoapReadTools(
@@ -60,10 +95,11 @@ export function registerSoapReadTools(
     },
     async () => {
       try {
-        const records = await callAndExtract(soapClient, "GetGroups", "");
+        const { records, _debug } = await callAndExtract(soapClient, "GetGroups", "");
         return formatSuccess({
           groups: records,
           total_records: records.length,
+          ...(_debug && { _debug }),
         });
       } catch (err: unknown) {
         const e = err as { status?: number; message?: string };
@@ -90,7 +126,7 @@ export function registerSoapReadTools(
     async (params) => {
       try {
         const body = `<ret:date>${params.date}T00:00:00</ret:date>${xmlOptional("ret:sku", params.sku)}${xmlOptional("ret:outletId", params.outlet_id)}`;
-        const records = await callAndExtract(
+        const { records, _debug } = await callAndExtract(
           soapClient,
           "GetDailyStockMovements",
           body
@@ -100,6 +136,7 @@ export function registerSoapReadTools(
           date: params.date,
           movements: records,
           total_records: records.length,
+          ...(_debug && { _debug }),
         });
       } catch (err: unknown) {
         const e = err as { status?: number; message?: string };
@@ -126,7 +163,7 @@ export function registerSoapReadTools(
     async (params) => {
       try {
         const body = `<ret:fromDate>${params.from_date}T00:00:00</ret:fromDate><ret:includeExported>${params.include_exported ?? true}</ret:includeExported>${xmlOptional("ret:sourceType", params.source_type)}`;
-        const records = await callAndExtract(
+        const { records, _debug } = await callAndExtract(
           soapClient,
           "GetStockReceipts",
           body
@@ -136,6 +173,7 @@ export function registerSoapReadTools(
           from_date: params.from_date,
           receipts: records,
           total_records: records.length,
+          ...(_debug && { _debug }),
         });
       } catch (err: unknown) {
         const e = err as { status?: number; message?: string };
@@ -162,7 +200,7 @@ export function registerSoapReadTools(
     async (params) => {
       try {
         const body = `<ret:dateFrom>${params.date_from}T00:00:00</ret:dateFrom><ret:dateTo>${params.date_to}T23:59:59</ret:dateTo>${params.adjustment_id !== undefined ? `<ret:adjustmentId>${params.adjustment_id}</ret:adjustmentId>` : ""}${params.whid !== undefined ? `<ret:whid>${params.whid}</ret:whid>` : ""}`;
-        const records = await callAndExtract(
+        const { records, _debug } = await callAndExtract(
           soapClient,
           "GetStockAdjustments",
           body
@@ -173,6 +211,7 @@ export function registerSoapReadTools(
           date_to: params.date_to,
           adjustments: records,
           total_records: records.length,
+          ...(_debug && { _debug }),
         });
       } catch (err: unknown) {
         const e = err as { status?: number; message?: string };
@@ -199,7 +238,7 @@ export function registerSoapReadTools(
     async (params) => {
       try {
         const body = `<ret:dateFrom>${params.date_from}T00:00:00</ret:dateFrom><ret:dateTo>${params.date_to}T23:59:59</ret:dateTo>${params.poid !== undefined ? `<ret:poid>${params.poid}</ret:poid>` : ""}${params.whid !== undefined ? `<ret:whid>${params.whid}</ret:whid>` : ""}${xmlOptional("ret:outletExtRef", params.outlet_ext_ref)}`;
-        const records = await callAndExtract(
+        const { records, _debug } = await callAndExtract(
           soapClient,
           "GetPurchaseOrdersDetailed",
           body
@@ -210,6 +249,7 @@ export function registerSoapReadTools(
           date_to: params.date_to,
           purchase_orders: records,
           total_records: records.length,
+          ...(_debug && { _debug }),
         });
       } catch (err: unknown) {
         const e = err as { status?: number; message?: string };
@@ -235,7 +275,7 @@ export function registerSoapReadTools(
     },
     async () => {
       try {
-        const records = await callAndExtract(
+        const { records, _debug } = await callAndExtract(
           soapClient,
           "GetPurchaseOrdersWithSupplierInvNo",
           ""
@@ -244,6 +284,7 @@ export function registerSoapReadTools(
         return formatSuccess({
           purchase_orders: records,
           total_records: records.length,
+          ...(_debug && { _debug }),
         });
       } catch (err: unknown) {
         const e = err as { status?: number; message?: string };

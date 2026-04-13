@@ -218,10 +218,13 @@ export function extractRecords(xml: string, elementTag: string): Record<string, 
 
 /**
  * Extract the SOAP result element content for a given action.
- * Looks for <{Action}Result>...</{Action}Result> in the response.
+ * Handles namespace-prefixed tags (e.g. <ret:GetGroupsResult>).
  */
 export function extractSoapResult(xml: string, action: string): string {
-  const regex = new RegExp(`<${action}Result\\b[^>]*>([\\s\\S]*?)<\\/${action}Result>`);
+  // Match with or without namespace prefix
+  const regex = new RegExp(
+    `<(?:\\w+:)?${action}Result\\b[^>]*>([\\s\\S]*?)<\\/(?:\\w+:)?${action}Result>`
+  );
   const match = xml.match(regex);
   return match?.[1]?.trim() ?? "";
 }
