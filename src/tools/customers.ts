@@ -14,7 +14,7 @@ export function registerCustomerTools(server: McpServer, client: RexClient): voi
     "rex_list_customers",
     {
       description:
-        "List customers from RetailExpress. Filter by name, email, customer type, or date range. Returns paginated results.",
+        "List customers from RetailExpress. Filter by customer type or updated-since date. Returns paginated results (up to 62k records total). NOTE — name/email search not supported: REX API does not filter by name or email; those params have been removed. To find a specific customer: (1) if you have their order number, use rex_get_order which returns customer details; (2) to sweep recent customers by date, use rex_list_customers_soap with a last_updated date; (3) use updated_since or customer_type_id to narrow results.",
       inputSchema: listCustomersSchema,
       annotations: {
         readOnlyHint: true,

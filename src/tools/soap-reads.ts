@@ -452,7 +452,7 @@ export function registerSoapReadTools(
     {
       title: "List Orders (Detailed Headers)",
       description:
-        "List detailed order headers for a date range. Returns OrderNumber, WHID, WarehouseName, CustomerNumber, OrderStatus, DateCreated, OrderTotal, FreightTotal, Bill_Name, Bill_Address, Bill_Suburb, Bill_State, Bill_Postcode, BillCountry, BillEmail, Bill_Phone, isRefund, isWebOrder, isWebServiceOrder, OriginalOrderNumber. Date parameters are inclusive. Uses the IPS SOAP API.",
+        "List detailed order headers for a date range. Returns one row per order: OrderNumber, WHID, WarehouseName, CustomerNumber, OrderStatus, DateCreated, OrderTotal, FreightTotal, Bill_Name, Bill_Address, Bill_Suburb, Bill_State, Bill_Postcode, BillCountry, BillEmail, Bill_Phone, isRefund, isWebOrder, isWebServiceOrder, OriginalOrderNumber. IMPORTANT — refund classification: isRefund=1 appears on TWO record types. Rows with OriginalOrderNumber populated are actual refund credits (refund_type=\"refund_credit\"). Rows with isRefund=1 but no OriginalOrderNumber are the original sales that were flagged (refund_type=\"flagged_original\"). A derived refund_type field (\"sale\" | \"refund_credit\" | \"flagged_original\") is added to every record. To sum true refund value: filter refund_type=\"refund_credit\" only. Date parameters are inclusive. Uses the IPS SOAP API.",
       inputSchema: getOrdersDetailedSchema,
       annotations: {
         readOnlyHint: true,
@@ -470,11 +470,21 @@ export function registerSoapReadTools(
           body
         );
 
+        const classified = records.map((r) => {
+          let refund_type: string;
+          if (r["isRefund"] === "1" || r["isRefund"] === "true") {
+            refund_type = r["OriginalOrderNumber"] ? "refund_credit" : "flagged_original";
+          } else {
+            refund_type = "sale";
+          }
+          return { ...r, refund_type };
+        });
+
         return formatSuccess({
           date_from: params.date_from,
           date_to: params.date_to,
-          orders: records,
-          total_records: records.length,
+          orders: classified,
+          total_records: classified.length,
         });
       } catch (err: unknown) {
         return handleError(err);
